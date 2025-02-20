@@ -1,0 +1,4 @@
+apiVersion: v2
+name: zeebe-node-watcher
+version: 0.1.0
+description: Helm chart for Zeebe Node Watcher

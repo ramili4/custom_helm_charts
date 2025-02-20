@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: zeebe-node-watcher
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: zeebe-node-watcher
+spec:
+  selector:
+    matchLabels:
+      app: zeebe-node-watcher
+  template:
+    metadata:
+      labels:
+        app: zeebe-node-watcher
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+      - name: watcher
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            NODE_NAME=$(echo $MY_NODE_NAME)
+            echo "Watching for terminating pods on node $NODE_NAME..."
+            kubectl get pods -l app=zeebe-broker --watch -o json | jq -c '. | select(.object.metadata.deletionTimestamp != null)' | while read -r event; do
+              POD_NODE=$(echo $event | jq -r '.object.spec.nodeName')
+              POD_NAME=$(echo $event | jq -r '.object.metadata.name')
+
+              if [ "$POD_NODE" = "$NODE_NAME" ]; then
+                echo "Pod $POD_NAME is terminating on $NODE_NAME. Tainting node immediately..."
+                kubectl taint nodes $NODE_NAME zeebe-broker=true:NoSchedule --overwrite
+
+                while kubectl get pod $POD_NAME >/dev/null 2>&1; do
+                  sleep 1
+                done
+
+                echo "Pod fully terminated. Keeping taint for 20 seconds..."
+                sleep 20
+
+                kubectl taint nodes $NODE_NAME zeebe-broker:NoSchedule-
+                echo "Taint removed from $NODE_NAME."
+              fi
+            done
+        env:
+        - name: MY_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        resources:
+          limits:
+            cpu: {{ .Values.resources.limits.cpu }}
+            memory: {{ .Values.resources.limits.memory }}
+          requests:
+            cpu: {{ .Values.resources.requests.cpu }}
+            memory: {{ .Values.resources.requests.memory }}
