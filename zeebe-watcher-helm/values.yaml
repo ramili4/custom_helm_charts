@@ -1,0 +1,17 @@
+namespace: default
+
+serviceAccount:
+  name: zeebe-node-watcher-sa
+
+image:
+  repository: myrepo/zeebe-node-watcher
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: "100m"
+    memory: "128Mi"
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
