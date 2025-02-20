@@ -1,1 +1,1 @@
-# custom_helm_charts
+Storing custom helm charts that have been used
